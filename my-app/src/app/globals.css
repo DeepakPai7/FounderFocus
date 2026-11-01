@@ -104,24 +104,3 @@ nav p:hover {
   color: #64748b;
   font-size: 14px;
 }
-.add-task {
-  margin-top: 35px;
-  margin-bottom: 30px;
-}
-
-.add-task input {
-  padding: 12px;
-  width: 70%;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-}
-
-.add-task button {
-  padding: 12px 20px;
-  margin-left: 10px;
-  background-color: #1e293b;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
