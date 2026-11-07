@@ -7,23 +7,29 @@ import TaskCard from "../../components/TaskCard";
 import Sidebar from "../../components/Sidebar";
 
 export default function Tasks() {
-    const { tasks, setTasks } = useContext(TaskContext);
+    const { tasks, setTasks, goals } = useContext(TaskContext);
 
     const [taskTitle, setTaskTitle] = useState("");
     const [taskDate, setTaskDate] = useState("");
     const [taskPriority, setTaskPriority] = useState("Medium");
+    const [taskImpact, setTaskImpact] = useState("Medium");
+    const [taskEffort, setTaskEffort] = useState("1 hour");
+    const [taskDeadlineType, setTaskDeadlineType] = useState("Flexible");
+    const [taskGoalId, setTaskGoalId] = useState("");
 
     const [editingId, setEditingId] = useState(null);
     const [editTitle, setEditTitle] = useState("");
     const [editDate, setEditDate] = useState("");
     const [editPriority, setEditPriority] = useState("Medium");
+    const [editImpact, setEditImpact] = useState("Medium");
+    const [editEffort, setEditEffort] = useState("1 hour");
+    const [editDeadlineType, setEditDeadlineType] = useState("Flexible");
+    const [editGoalId, setEditGoalId] = useState("");
 
-    // Search and filter states
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
     const [priorityFilter, setPriorityFilter] = useState("All");
 
-    // Filter tasks
     const filteredTasks = tasks.filter((task) => {
         const matchesSearch = task.title
             .toLowerCase()
@@ -39,6 +45,10 @@ export default function Tasks() {
         return matchesSearch && matchesStatus && matchesPriority;
     });
 
+    const postponedTasks = tasks.filter(
+        (task) => (task.postponedCount || 0) > 0
+    );
+
     // Add a new task
     function handleAddTask() {
         if (!taskTitle.trim() || !taskDate) return;
@@ -48,7 +58,14 @@ export default function Tasks() {
             title: taskTitle.trim(),
             date: taskDate,
             priority: taskPriority,
-            status: "Pending"
+            impact: taskImpact,
+            estimatedEffort: taskEffort,
+            deadlineType: taskDeadlineType,
+            goalId: taskGoalId ? Number(taskGoalId) : null,
+            status: "Pending",
+            postponedCount: 0,
+            lastPostponedDate: null,
+            completedAt: null
         };
 
         setTasks([...tasks, newTask]);
@@ -56,13 +73,21 @@ export default function Tasks() {
         setTaskTitle("");
         setTaskDate("");
         setTaskPriority("Medium");
+        setTaskImpact("Medium");
+        setTaskEffort("1 hour");
+        setTaskDeadlineType("Flexible");
+        setTaskGoalId("");
     }
 
-    // Complete a task
+    // Complete a task and record its completion date
     function handleCompleteTask(id) {
         setTasks(tasks.map((task) =>
             task.id === id
-                ? { ...task, status: "Completed" }
+                ? {
+                    ...task,
+                    status: "Completed",
+                    completedAt: new Date().toISOString()
+                }
                 : task
         ));
     }
@@ -72,7 +97,7 @@ export default function Tasks() {
         setTasks(tasks.filter((task) => task.id !== id));
 
         if (editingId === id) {
-            setEditingId(null);
+            cancelEdit();
         }
     }
 
@@ -82,9 +107,13 @@ export default function Tasks() {
         setEditTitle(task.title);
         setEditDate(task.date);
         setEditPriority(task.priority || "Medium");
+        setEditImpact(task.impact || "Medium");
+        setEditEffort(task.estimatedEffort || "1 hour");
+        setEditDeadlineType(task.deadlineType || "Flexible");
+        setEditGoalId(task.goalId ? String(task.goalId) : "");
     }
 
-    // Save changes
+    // Save edited task
     function handleSaveEdit(id) {
         if (!editTitle.trim() || !editDate) return;
 
@@ -94,7 +123,11 @@ export default function Tasks() {
                     ...task,
                     title: editTitle.trim(),
                     date: editDate,
-                    priority: editPriority
+                    priority: editPriority,
+                    impact: editImpact,
+                    estimatedEffort: editEffort,
+                    deadlineType: editDeadlineType,
+                    goalId: editGoalId ? Number(editGoalId) : null
                 }
                 : task
         ));
@@ -102,7 +135,30 @@ export default function Tasks() {
         setEditingId(null);
     }
 
-    // Postpone by one day
+    // Cancel editing
+    function cancelEdit() {
+        setEditingId(null);
+        setEditTitle("");
+        setEditDate("");
+        setEditPriority("Medium");
+        setEditImpact("Medium");
+        setEditEffort("1 hour");
+        setEditDeadlineType("Flexible");
+        setEditGoalId("");
+    }
+
+    // Get today's date
+    function getTodayDate() {
+        const today = new Date();
+
+        return [
+            today.getFullYear(),
+            String(today.getMonth() + 1).padStart(2, "0"),
+            String(today.getDate()).padStart(2, "0")
+        ].join("-");
+    }
+
+    // Postpone a task by one day
     function handlePostponeTask(id) {
         setTasks(tasks.map((task) => {
             if (task.id === id) {
@@ -115,7 +171,12 @@ export default function Tasks() {
                     String(newDate.getDate()).padStart(2, "0")
                 ].join("-");
 
-                return { ...task, date: updatedDate };
+                return {
+                    ...task,
+                    date: updatedDate,
+                    postponedCount: (task.postponedCount || 0) + 1,
+                    lastPostponedDate: getTodayDate()
+                };
             }
 
             return task;
@@ -141,12 +202,14 @@ export default function Tasks() {
                         onChange={(e) => setTaskTitle(e.target.value)}
                     />
 
+                    <label>Deadline Date</label>
                     <input
                         type="date"
                         value={taskDate}
                         onChange={(e) => setTaskDate(e.target.value)}
                     />
 
+                    <label>Priority</label>
                     <select
                         value={taskPriority}
                         onChange={(e) => setTaskPriority(e.target.value)}
@@ -156,18 +219,60 @@ export default function Tasks() {
                         <option value="Low">Low Priority</option>
                     </select>
 
+                    <label>Business Impact</label>
+                    <select
+                        value={taskImpact}
+                        onChange={(e) => setTaskImpact(e.target.value)}
+                    >
+                        <option value="High">High Impact</option>
+                        <option value="Medium">Medium Impact</option>
+                        <option value="Low">Low Impact</option>
+                    </select>
+
+                    <label>Estimated Effort</label>
+                    <select
+                        value={taskEffort}
+                        onChange={(e) => setTaskEffort(e.target.value)}
+                    >
+                        <option value="15 minutes">15 minutes</option>
+                        <option value="30 minutes">30 minutes</option>
+                        <option value="1 hour">1 hour</option>
+                        <option value="2 hours">2 hours</option>
+                        <option value="4 hours">4 hours</option>
+                    </select>
+
+                    <label>Deadline Type</label>
+                    <select
+                        value={taskDeadlineType}
+                        onChange={(e) => setTaskDeadlineType(e.target.value)}
+                    >
+                        <option value="Hard">Hard Deadline</option>
+                        <option value="Flexible">Flexible Deadline</option>
+                    </select>
+
+                    <label>Connect to Business Goal</label>
+                    <select
+                        value={taskGoalId}
+                        onChange={(e) => setTaskGoalId(e.target.value)}
+                    >
+                        <option value="">No Business Goal</option>
+                        {goals.map((goal) => (
+                            <option key={goal.id} value={goal.id}>
+                                {goal.title}
+                            </option>
+                        ))}
+                    </select>
+
                     <button onClick={handleAddTask}>
                         Add Task
                     </button>
                 </div>
 
-                {/* Task List */}
+                {/* All Tasks */}
                 <div className="upcoming-tasks">
                     <h2>All Tasks</h2>
 
-                    {/* Search and Filters */}
                     <div className="task-filters">
-
                         <input
                             type="text"
                             placeholder="Search tasks by title..."
@@ -193,7 +298,6 @@ export default function Tasks() {
                             <option value="Medium">Medium Priority</option>
                             <option value="Low">Low Priority</option>
                         </select>
-
                     </div>
 
                     <p>
@@ -205,7 +309,9 @@ export default function Tasks() {
                     )}
 
                     {tasks.length > 0 && filteredTasks.length === 0 && (
-                        <p>No matching tasks found. Try changing your search or filters.</p>
+                        <p>
+                            No matching tasks found. Try changing your search or filters.
+                        </p>
                     )}
 
                     {filteredTasks.map((task) => (
@@ -217,42 +323,72 @@ export default function Tasks() {
                                     <input
                                         type="text"
                                         value={editTitle}
-                                        onChange={(e) =>
-                                            setEditTitle(e.target.value)
-                                        }
+                                        onChange={(e) => setEditTitle(e.target.value)}
                                     />
 
                                     <input
                                         type="date"
                                         value={editDate}
-                                        onChange={(e) =>
-                                            setEditDate(e.target.value)
-                                        }
+                                        onChange={(e) => setEditDate(e.target.value)}
                                     />
 
                                     <select
                                         value={editPriority}
-                                        onChange={(e) =>
-                                            setEditPriority(e.target.value)
-                                        }
+                                        onChange={(e) => setEditPriority(e.target.value)}
                                     >
-                                        <option value="High">High</option>
-                                        <option value="Medium">Medium</option>
-                                        <option value="Low">Low</option>
+                                        <option value="High">High Priority</option>
+                                        <option value="Medium">Medium Priority</option>
+                                        <option value="Low">Low Priority</option>
                                     </select>
 
-                                    <button onClick={() =>
-                                        handleSaveEdit(task.id)
-                                    }>
+                                    <select
+                                        value={editImpact}
+                                        onChange={(e) => setEditImpact(e.target.value)}
+                                    >
+                                        <option value="High">High Impact</option>
+                                        <option value="Medium">Medium Impact</option>
+                                        <option value="Low">Low Impact</option>
+                                    </select>
+
+                                    <select
+                                        value={editEffort}
+                                        onChange={(e) => setEditEffort(e.target.value)}
+                                    >
+                                        <option value="15 minutes">15 minutes</option>
+                                        <option value="30 minutes">30 minutes</option>
+                                        <option value="1 hour">1 hour</option>
+                                        <option value="2 hours">2 hours</option>
+                                        <option value="4 hours">4 hours</option>
+                                    </select>
+
+                                    <select
+                                        value={editDeadlineType}
+                                        onChange={(e) => setEditDeadlineType(e.target.value)}
+                                    >
+                                        <option value="Hard">Hard Deadline</option>
+                                        <option value="Flexible">Flexible Deadline</option>
+                                    </select>
+
+                                    <label>Business Goal</label>
+                                    <select
+                                        value={editGoalId}
+                                        onChange={(e) => setEditGoalId(e.target.value)}
+                                    >
+                                        <option value="">No Business Goal</option>
+                                        {goals.map((goal) => (
+                                            <option key={goal.id} value={goal.id}>
+                                                {goal.title}
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    <button onClick={() => handleSaveEdit(task.id)}>
                                         Save
                                     </button>
 
-                                    <button onClick={() =>
-                                        setEditingId(null)
-                                    }>
+                                    <button onClick={cancelEdit}>
                                         Cancel
                                     </button>
-
                                 </div>
                             ) : (
                                 <>
@@ -262,38 +398,69 @@ export default function Tasks() {
 
                                         {task.status !== "Completed" && (
                                             <>
-                                                <button onClick={() =>
-                                                    handleCompleteTask(task.id)
-                                                }>
+                                                <button onClick={() => handleCompleteTask(task.id)}>
                                                     Complete
                                                 </button>
 
-                                                <button onClick={() =>
-                                                    handlePostponeTask(task.id)
-                                                }>
+                                                <button onClick={() => handlePostponeTask(task.id)}>
                                                     Postpone +1 Day
                                                 </button>
                                             </>
                                         )}
 
-                                        <button onClick={() =>
-                                            handleEditTask(task)
-                                        }>
+                                        <button onClick={() => handleEditTask(task)}>
                                             Edit
                                         </button>
 
-                                        <button onClick={() =>
-                                            handleDeleteTask(task.id)
-                                        }>
+                                        <button onClick={() => handleDeleteTask(task.id)}>
                                             Delete
                                         </button>
-
                                     </div>
                                 </>
                             )}
-
                         </div>
                     ))}
+                </div>
+
+                {/* Postponed Tasks */}
+                <div className="upcoming-tasks">
+                    <h2>Postponed Tasks</h2>
+                    <p>Tasks that have been delayed at least once.</p>
+
+                    {postponedTasks.length === 0 ? (
+                        <p>No postponed tasks. Great work!</p>
+                    ) : (
+                        <>
+                            <p>
+                                Total postponed tasks: {postponedTasks.length}
+                            </p>
+
+                            {postponedTasks.map((task) => (
+                                <div key={task.id} className="task">
+                                    <TaskCard task={task} />
+
+                                    <p>
+                                        Current deadline: <strong>{task.date}</strong>
+                                    </p>
+
+                                    <p>
+                                        Postponed{" "}
+                                        <strong>
+                                            {task.postponedCount}{" "}
+                                            {task.postponedCount === 1 ? "time" : "times"}
+                                        </strong>
+                                    </p>
+
+                                    <p>
+                                        Last postponed:{" "}
+                                        <strong>
+                                            {task.lastPostponedDate || "Date unavailable"}
+                                        </strong>
+                                    </p>
+                                </div>
+                            ))}
+                        </>
+                    )}
                 </div>
             </section>
         </main>

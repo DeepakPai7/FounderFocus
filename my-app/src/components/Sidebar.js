@@ -8,6 +8,7 @@ export default function Sidebar() {
             <nav>
                 <Link href="/dashboard">Dashboard</Link>
                 <Link href="/tasks">My Tasks</Link>
+                <Link href="/goals">Business Goals</Link>
                 <Link href="/priorities">Priorities</Link>
                 <Link href="/progress">Progress</Link>
             </nav>

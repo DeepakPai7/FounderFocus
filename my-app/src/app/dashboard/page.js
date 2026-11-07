@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState, useContext } from "react";
 import { TaskContext } from "@/context/TaskContext";
 import Sidebar from "../../components/Sidebar";
+import { getTopPriorities } from "../../utils/prioritization";
 
 export default function Dashboard() {
     const { tasks, setTasks } = useContext(TaskContext);
@@ -12,58 +13,17 @@ export default function Dashboard() {
     const [taskTitle, setTaskTitle] = useState("");
     const [taskDate, setTaskDate] = useState("");
 
-    // Get today's date
+    // Today's date
     const today = new Date();
 
-    const todayDate = `${today.getFullYear()}-${String(
-        today.getMonth() + 1
-    ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const todayDate = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, "0"),
+        String(today.getDate()).padStart(2, "0")
+    ].join("-");
 
-    // Priority ranking
-    const priorityOrder = {
-        High: 1,
-        Medium: 2,
-        Low: 3
-    };
-
-    // Calculate top 3 priorities
-    const topPriorities = [...tasks]
-        .filter((task) => task.status !== "Completed")
-        .sort((a, b) => {
-            const priorityA = priorityOrder[a.priority || "Medium"];
-            const priorityB = priorityOrder[b.priority || "Medium"];
-
-            if (priorityA !== priorityB) {
-                return priorityA - priorityB;
-            }
-
-            return a.date.localeCompare(b.date);
-        })
-        .slice(0, 3);
-
-    // Explain why each task was selected
-    function getPriorityReason(task, index) {
-        const priority = task.priority || "Medium";
-
-        if (task.date < todayDate) {
-            return "This task is overdue and needs attention.";
-        }
-
-        if (index === 0) {
-            return priority === "High"
-                ? "Ranked first because it has High importance."
-                : "Ranked first because it has the highest available importance and earliest deadline.";
-        }
-
-        const previousTask = topPriorities[index - 1];
-        const previousPriority = previousTask.priority || "Medium";
-
-        if (priorityOrder[priority] > priorityOrder[previousPriority]) {
-            return `Ranked after a ${previousPriority}-priority task because this task has lower importance.`;
-        }
-
-        return "Ranked after another task of the same importance because its deadline is later.";
-    }
+    // Shared prioritization engine
+    const topPriorities = getTopPriorities(tasks);
 
     // Add a new task
     function handleAddTask() {
@@ -74,7 +34,14 @@ export default function Dashboard() {
             title: taskTitle.trim(),
             date: taskDate,
             priority: "Medium",
-            status: "Pending"
+            impact: "Medium",
+            estimatedEffort: "1 hour",
+            deadlineType: "Flexible",
+            status: "Pending",
+            goalId: null,
+            postponedCount: 0,
+            lastPostponedDate: null,
+            completedAt: null
         };
 
         setTasks([...tasks, newTask]);
@@ -83,11 +50,15 @@ export default function Dashboard() {
         setTaskDate("");
     }
 
-    // Complete a task
+    // Complete a task and record its completion date
     function handleCompleteTask(id) {
         setTasks(tasks.map((task) =>
             task.id === id
-                ? { ...task, status: "Completed" }
+                ? {
+                    ...task,
+                    status: "Completed",
+                    completedAt: new Date().toISOString()
+                }
                 : task
         ));
     }
@@ -108,7 +79,6 @@ export default function Dashboard() {
         (task) => task.status === "Pending"
     ).length;
 
-    // Find overdue tasks
     const overdueTasks = tasks.filter(
         (task) =>
             task.date < todayDate &&
@@ -156,14 +126,21 @@ export default function Dashboard() {
                                 {index + 1}. {task.title}
                             </h3>
 
-                            <p>Deadline: {task.date}</p>
-
                             <p>
-                                Importance: {task.priority || "Medium"}
+                                Priority Score: <strong>{task.priorityScore}</strong>
                             </p>
 
+                            <p>Deadline: {task.date}</p>
+
+                            <p>Business Impact: {task.impact || "Medium"}</p>
+
+                            <p>Estimated Effort: {task.estimatedEffort || "1 hour"}</p>
+
+                            <p>Deadline Type: {task.deadlineType || "Flexible"}</p>
+
                             <p>
-                                Why selected: {getPriorityReason(task, index)}
+                                <strong>Why selected:</strong>{" "}
+                                {task.priorityReason}
                             </p>
                         </div>
                     ))}
@@ -203,7 +180,11 @@ export default function Dashboard() {
                         <button type="submit">Add Task</button>
                     </form>
 
-                    <p>Tasks added here receive Medium priority by default.</p>
+                    <p>
+                        Tasks added here receive Medium impact,
+                        1-hour effort and a Flexible deadline by default.
+                        You can edit these details under My Tasks.
+                    </p>
                 </div>
 
                 {/* Upcoming Tasks */}
@@ -225,6 +206,7 @@ export default function Dashboard() {
                                     <h3>{task.title}</h3>
                                     <p>Due: {task.date}</p>
                                     <p>Priority: {task.priority || "Medium"}</p>
+                                    <p>Impact: {task.impact || "Medium"}</p>
                                 </div>
 
                                 <span>{task.status}</span>
